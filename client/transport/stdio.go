@@ -182,7 +182,6 @@ func (c *Stdio) spawnCommand(ctx context.Context) error {
 		return err
 	}
 
-	// Configure process termination behavior (Go 1.20+).
 	// On Windows, closing stdin doesn't reliably signal EOF to the subprocess,
 	// so we must explicitly kill it when context cancels.
 	cmd.Cancel = func() error {
