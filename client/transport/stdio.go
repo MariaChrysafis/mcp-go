@@ -29,25 +29,25 @@ type Stdio struct {
 	args    []string
 	env     []string
 
-	cmd            *exec.Cmd
-	cmdFunc        CommandFunc
-	stdin          io.WriteCloser
-	stdout         *bufio.Reader
-	stderr         io.ReadCloser
-	responses      map[string]chan *JSONRPCResponse
-	mu             sync.RWMutex
+	cmd              *exec.Cmd
+	cmdFunc          CommandFunc
+	stdin            io.WriteCloser
+	stdout           *bufio.Reader
+	stderr           io.ReadCloser
+	responses        map[string]chan *JSONRPCResponse
+	mu               sync.RWMutex
 	done             chan struct{}
 	closeOnce        sync.Once
 	closeCleanupOnce sync.Once
 	onNotification   func(mcp.JSONRPCNotification)
-	notifyMu       sync.RWMutex
-	onRequest      RequestHandler
-	requestMu      sync.RWMutex
-	ctx            context.Context
-	ctxMu          sync.RWMutex
-	logger         util.Logger
-	started        bool
-	startedMu      sync.Mutex
+	notifyMu         sync.RWMutex
+	onRequest        RequestHandler
+	requestMu        sync.RWMutex
+	ctx              context.Context
+	ctxMu            sync.RWMutex
+	logger           util.Logger
+	started          bool
+	startedMu        sync.Mutex
 }
 
 // StdioOption defines a function that configures a Stdio transport instance.
@@ -180,6 +180,16 @@ func (c *Stdio) spawnCommand(ctx context.Context) error {
 		cmd.Env = append(os.Environ(), c.env...)
 	} else if cmd, err = c.cmdFunc(ctx, c.command, c.env, c.args); err != nil {
 		return err
+	}
+
+	// Configure process termination behavior (Go 1.20+).
+	// On Windows, closing stdin doesn't reliably signal EOF to the subprocess,
+	// so we must explicitly kill it when context cancels.
+	cmd.Cancel = func() error {
+		if cmd.Process != nil {
+			return cmd.Process.Kill()
+		}
+		return nil
 	}
 
 	stdin, err := cmd.StdinPipe()
